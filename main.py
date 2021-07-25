@@ -11,7 +11,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from threading import Thread
 from time import sleep, strftime
-from functions.network import getIpAddress
 
 brightness = float(0)
 pref_bri = float(0)
