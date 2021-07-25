@@ -66,11 +66,6 @@ def feedback(url):
     brightness = int(url[len(url)-1]) / 100
 
 class S(BaseHTTPRequestHandler):
-    protocol_version = 'HTTP/1.1'
-    server_version = 'nginx'
-    sys_version = ''
-
-
     def _set_headers(self):
 
         self.send_response(200)
