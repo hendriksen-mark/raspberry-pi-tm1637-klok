@@ -1,16 +1,13 @@
 #!/usr/bin/python3
-import json
 import logging
 import os
-import sys
 import time
-import RPi.GPIO as GPIO
 import tm1637
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from threading import Thread
-from time import sleep, strftime
+from time import sleep
 
 brightness = float(0)
 pref_bri = float(0)
@@ -23,8 +20,6 @@ HOST_HTTP_PORT = 8000
 
 logging.info("Using Host %s:%s" % (HOST_IP, HOST_HTTP_PORT))
 
-def scan_for_lights():
-    print('scan_for_lights')
 
 def show():
     ShowDoublepoint = False
@@ -36,9 +31,6 @@ def show():
         now = datetime.now()
         hour = now.hour
         minute = now.minute
-        second = now.second
-        #timenow = datetime.now().strftime("%H%M")
-        #currenttime = [int(timenow[0]), int(timenow[1]), int(timenow[2]), int(timenow[3])]
         currenttime = [ int(hour / 10), hour % 10, int(minute / 10), minute % 10 ]
         if pref_currenttime != currenttime:
             Display.Show(currenttime)
@@ -73,8 +65,6 @@ class S(BaseHTTPRequestHandler):
         mimetypes = {"json": "application/json", "map": "application/json", "html": "text/html", "xml": "application/xml", "js": "text/javascript", "css": "text/css", "png": "image/png"}
         if self.path.endswith((".html",".json",".css",".map",".png",".js", ".xml")):
             self.send_header('Content-type', mimetypes[self.path.split(".")[-1]])
-        elif self.path.startswith("/api"):
-            self.send_header('Content-type', mimetypes["json"])
         else:
             self.send_header('Content-type', mimetypes["html"])
 
@@ -92,12 +82,7 @@ class S(BaseHTTPRequestHandler):
     def do_GET(self):
         self.read_http_request_body()
 
-        if self.path.startswith("/scan"):
-            self._set_headers()
-            scan_for_lights()
-            self._set_end_headers(bytes("done", "utf8"))
-
-        elif self.path.startswith("/Bri"):
+        if self.path.startswith("/Bri"):
             self._set_headers()
             url_pices = self.path.rstrip('/').split('/')
             feedback(url_pices)
