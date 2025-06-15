@@ -8,8 +8,10 @@ from socketserver import ThreadingMixIn
 from threading import Thread
 from time import sleep
 
-logging.basicConfig(level=logging.INFO)
-logging.Formatter('%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
+)
 
 brightness = 0.5  # Default brightness (0.0 - 1.0)
 last_brightness = None
