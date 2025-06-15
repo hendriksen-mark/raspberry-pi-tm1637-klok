@@ -86,6 +86,7 @@ class S(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
 
     def _set_end_headers(self, data):
+        self._set_headers("application/json")
         self.send_header('Content-Length', len(data))
         self.end_headers()
         self.wfile.write(data)
@@ -93,24 +94,19 @@ class S(BaseHTTPRequestHandler):
     def do_GET(self):
         global power_state, brightness
         if self.path.startswith("/Bri"):
-            self._set_headers("application/json")
             url_parts = self.path.rstrip('/').split('/')
             set_brightness_from_url(url_parts)
             self._set_end_headers(b"done")
         elif self.path == "/on":
             set_power(True)
-            self._set_headers("application/json")
             self._set_end_headers(b"on")
         elif self.path == "/off":
             set_power(False)
-            self._set_headers("application/json")
             self._set_end_headers(b"off")
         elif self.path == "/status":
-            self._set_headers("application/json")
             state = 1 if power_state else 0
             self._set_end_headers(str(state).encode())
         elif self.path == "/infoBri":
-            self._set_headers("application/json")
             bri_percent = int(brightness * 100)
             self._set_end_headers(str(bri_percent).encode())
         else:
