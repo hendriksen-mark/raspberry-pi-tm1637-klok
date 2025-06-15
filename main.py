@@ -107,7 +107,7 @@ class S(BaseHTTPRequestHandler):
             self._set_end_headers(b"off")
         elif self.path == "/status":
             self._set_headers("application/json")
-            state = power_state
+            state = 1 if power_state else 0
             self._set_end_headers(str(state).encode())
         elif self.path == "/infoBri":
             self._set_headers("application/json")
