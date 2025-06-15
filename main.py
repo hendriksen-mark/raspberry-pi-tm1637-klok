@@ -64,8 +64,10 @@ def set_brightness_from_url(url_parts):
     try:
         # Expecting /Bri/###, take last part as int
         value = int(url_parts[-1])
-        brightness = max(0.125, min(value / 100, 1.0))
-        logging.info(f"Brightness set to {brightness:.2f}")
+        # Map 0-100% to steps 1-7 (avoid 0)
+        step = min(7, max(1, round((value / 100) * 7)))
+        brightness = step / 7.0
+        logging.info(f"Brightness set to step {step}/7 ({brightness:.2f})")
     except Exception as e:
         logging.error(f"Invalid brightness value: {url_parts} ({e})")
 
