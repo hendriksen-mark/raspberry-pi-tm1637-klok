@@ -13,7 +13,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
 )
 
-brightness = 0.5  # Default brightness (0.0 - 1.0)
+brightness = 0.0  # Default brightness (0.0 - 1.0)
 last_brightness = None
 last_time = None
 last_doublepoint = None
