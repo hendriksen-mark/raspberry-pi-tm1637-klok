@@ -194,14 +194,14 @@ class TM1637:
 
 if __name__ == "__main__":
     """Confirm the display operation"""
-    display = TM1637(CLK=21, DIO=20, brightness=1.0)
+    display = TM1637(CLK=21, DIO=20)  # removed brightness argument
 
     display.Clear()
 
     digits = [1, 2, 3, 4]
     display.Show(digits)
     print ("1234  - Working? (Press Key)")
-    scrap = raw_input()
+    scrap = input()  # changed from raw_input to input
 
     print ("Updating one digit at a time:")
     display.Clear()
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     sleep(0.5)
     display.Show1(0, 4)
     print ("4321  - (Press Key)")
-    scrap = raw_input()
+    scrap = input()  # changed from raw_input to input
 
     print ("Add double point\n")
     display.ShowDoublepoint(True)

@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 import logging
 import os
-import time
 import tm1637
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -9,114 +8,123 @@ from socketserver import ThreadingMixIn
 from threading import Thread
 from time import sleep
 
-brightness = float(0)
-pref_bri = float(0)
-pref_currenttime = int()
-pref_ShowDoublepoint = int()
-Display = tm1637.TM1637(23,24)
+logging.basicConfig(level=logging.INFO)
 
-HOST_IP = os.getenv('IP')
+brightness = 0.5  # Default brightness (0.0 - 1.0)
+last_brightness = None
+last_time = None
+last_doublepoint = None
+Display = tm1637.TM1637(24, 23)
+
+HOST_IP = os.getenv('IP', '0.0.0.0')
 HOST_HTTP_PORT = 8000
 
-logging.info("Using Host %s:%s" % (HOST_IP, HOST_HTTP_PORT))
+logging.info("Using Host %s:%s", HOST_IP, HOST_HTTP_PORT)
 
+power_state = True  # True = on, False = off
 
 def show():
-    ShowDoublepoint = False
-    global brightness
-    global pref_bri
-    global pref_currenttime
-    global pref_ShowDoublepoint
-    while(True):
+    global brightness, last_brightness, last_time, last_doublepoint, power_state
+    doublepoint = False
+    while True:
+        if not power_state:
+            if last_time is not None or last_brightness is not None or last_doublepoint is not None:
+                Display.Clear()
+                last_time = None
+                last_brightness = None
+                last_doublepoint = None
+            sleep(0.5)
+            continue
+
         now = datetime.now()
-        hour = now.hour
-        minute = now.minute
-        currenttime = [ int(hour / 10), hour % 10, int(minute / 10), minute % 10 ]
-        if pref_currenttime != currenttime:
-            Display.Show(currenttime)
-            pref_currenttime = currenttime
+        hour, minute = now.hour, now.minute
+        current_time = [hour // 10, hour % 10, minute // 10, minute % 10]
 
-        if pref_bri != brightness:
-            print("disp.sethelderheid " + str(brightness) )
-            print("pref_bri_befor " + str(pref_bri) )
+        # Update time display only if changed
+        if last_time != current_time:
+            Display.Show(current_time)
+            last_time = current_time
+
+        # Update brightness only if changed
+        if last_brightness != brightness:
             Display.SetBrightness(brightness)
-            pref_bri = brightness
-            print("pref_bri_after " + str(pref_bri) )
+            last_brightness = brightness
 
-        if pref_ShowDoublepoint != ShowDoublepoint:
-            Display.ShowDoublepoint(ShowDoublepoint)
-            pref_ShowDoublepoint = ShowDoublepoint
+        # Toggle and update doublepoint every loop
+        if last_doublepoint != doublepoint:
+            Display.ShowDoublepoint(doublepoint)
+            last_doublepoint = doublepoint
 
-        time.sleep(0.5)
-        ShowDoublepoint = not ShowDoublepoint
+        sleep(0.5)
+        doublepoint = not doublepoint
 
-
-def feedback(url):
+def set_brightness_from_url(url_parts):
     global brightness
-    print('Bri  ')
-    print(len(url))
-    brightness = int(url[len(url)-1]) / 100
+    try:
+        # Expecting /Bri/###, take last part as int
+        value = int(url_parts[-1])
+        brightness = max(0.125, min(value / 100, 1.0))
+        logging.info(f"Brightness set to {brightness:.2f}")
+    except Exception as e:
+        logging.error(f"Invalid brightness value: {url_parts} ({e})")
+
+def set_power(state):
+    global power_state
+    power_state = state
 
 class S(BaseHTTPRequestHandler):
-    def _set_headers(self):
-
+    def _set_headers(self, content_type="text/html"):
         self.send_response(200)
-
-        mimetypes = {"json": "application/json", "map": "application/json", "html": "text/html", "xml": "application/xml", "js": "text/javascript", "css": "text/css", "png": "image/png"}
-        if self.path.endswith((".html",".json",".css",".map",".png",".js", ".xml")):
-            self.send_header('Content-type', mimetypes[self.path.split(".")[-1]])
-        else:
-            self.send_header('Content-type', mimetypes["html"])
+        self.send_header('Content-type', content_type)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE')
+        self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
 
     def _set_end_headers(self, data):
         self.send_header('Content-Length', len(data))
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods',
-                         'GET, OPTIONS, POST, PUT, DELETE')
-        self.send_header("Access-Control-Allow-Headers", "X-Requested-With")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
         self.wfile.write(data)
 
-
     def do_GET(self):
-        self.read_http_request_body()
-
+        global power_state, brightness
         if self.path.startswith("/Bri"):
-            self._set_headers()
-            url_pices = self.path.rstrip('/').split('/')
-            feedback(url_pices)
-            self._set_end_headers(bytes("done", "utf8"))
-
+            self._set_headers("application/json")
+            url_parts = self.path.rstrip('/').split('/')
+            set_brightness_from_url(url_parts)
+            self._set_end_headers(b"done")
+        elif self.path == "/on":
+            set_power(True)
+            self._set_headers("application/json")
+            self._set_end_headers(b"on")
+        elif self.path == "/off":
+            set_power(False)
+            self._set_headers("application/json")
+            self._set_end_headers(b"off")
+        elif self.path == "/status":
+            self._set_headers("application/json")
+            state = b"on" if power_state else b"off"
+            self._set_end_headers(state)
+        elif self.path == "/infoBri":
+            self._set_headers("application/json")
+            bri_percent = int(brightness * 100)
+            self._set_end_headers(str(bri_percent).encode())
         else:
-            url_pices = self.path.rstrip('/').split('/')
-            if len(url_pices) < 3:
-                #self._set_headers_error()
-                logging.info(url_pices)
-                self.send_error(404, 'not found, set brightness : /Bri/###')
-                return
-
-    def read_http_request_body(self):
-        return b"{}" if self.headers['Content-Length'] is None or self.headers[
-            'Content-Length'] == '0' else self.rfile.read(int(self.headers['Content-Length']))
+            self.send_error(404, 'Not found, set brightness: /Bri/###')
 
 class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass
 
-def run(https, server_class=ThreadingSimpleServer, handler_class=S):
+def run(server_class=ThreadingSimpleServer, handler_class=S):
     server_address = ('', HOST_HTTP_PORT)
     httpd = server_class(server_address, handler_class)
     logging.info('Starting httpd...')
     httpd.serve_forever()
-    httpd.server_close()
 
 if __name__ == "__main__":
     try:
-        Thread(target=show).start()
-        Thread(target=run, args=[False]).start()
+        Thread(target=show, daemon=True).start()
+        Thread(target=run, daemon=True).start()
         while True:
             sleep(10)
     except Exception:
-        logging.exception("server stopped ")
-    finally:
-        run_service = False
+        logging.exception("Server stopped")
