@@ -108,7 +108,7 @@ class S(BaseHTTPRequestHandler):
         elif self.path == "/status":
             self._set_headers("application/json")
             state = power_state
-            self._set_end_headers(state)
+            self._set_end_headers(str(state).encode())
         elif self.path == "/infoBri":
             self._set_headers("application/json")
             bri_percent = int(brightness * 100)
