@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 import logging
-import os
 import tm1637
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from socketserver import ThreadingMixIn
 from threading import Thread
 from time import sleep
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,10 +19,7 @@ last_time = None
 last_doublepoint = None
 Display = tm1637.TM1637(24, 23)
 
-HOST_IP = os.getenv('IP', '0.0.0.0')
 HOST_HTTP_PORT = 8000
-
-logging.info("Using Host %s:%s", HOST_IP, HOST_HTTP_PORT)
 
 power_state = True  # True = on, False = off
 
@@ -61,70 +58,47 @@ def show():
         sleep(0.5)
         doublepoint = not doublepoint
 
-def set_brightness_from_url(url_parts):
+def set_brightness_from_url(value: int):
     global brightness
     try:
-        # Expecting /Bri/###, take last part as int
-        value = int(url_parts[-1])
         # Map 0-100% to steps 0-7 (include 0)
         step = min(7, max(0, round((value / 100) * 7)))
         brightness = step / 7.0
         logging.info(f"Brightness set to step {step}/7 ({brightness:.2f})")
     except Exception as e:
-        logging.error(f"Invalid brightness value: {url_parts} ({e})")
+        logging.error(f"Invalid brightness value: {value} ({e})")
 
 def set_power(state):
     global power_state
     power_state = state
 
-class S(BaseHTTPRequestHandler):
-    def _set_headers(self, content_type="text/html"):
-        self.send_response(200)
-        self.send_header('Content-type', content_type)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE')
-        self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
-
-    def _set_end_headers(self, data):
-        self._set_headers("application/json")
-        self.send_header('Content-Length', len(data))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def do_GET(self):
-        global power_state, brightness
-        if self.path.startswith("/Bri"):
-            url_parts = self.path.rstrip('/').split('/')
-            set_brightness_from_url(url_parts)
-            self._set_end_headers(b"done")
-        elif self.path == "/on":
-            set_power(True)
-            self._set_end_headers(b"on")
-        elif self.path == "/off":
-            set_power(False)
-            self._set_end_headers(b"off")
-        elif self.path == "/status":
-            state = 1 if power_state else 0
-            self._set_end_headers(str(state).encode())
-        elif self.path == "/infoBri":
-            bri_percent = int(brightness * 100)
-            self._set_end_headers(str(bri_percent).encode())
-        else:
-            self.send_error(404, 'Not found, set brightness: /Bri/###')
-
-class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
-    pass
-
-def run(server_class=ThreadingSimpleServer, handler_class=S):
-    server_address = ('', HOST_HTTP_PORT)
-    httpd = server_class(server_address, handler_class)
-    logging.info('Starting httpd...')
-    httpd.serve_forever()
+@app.route('/<request_type>/<value>', defaults={'value': None}, methods=['GET'])
+def handle_request(request_type: str, value: int):
+    if value is None:
+        value = request.args.get("value")
+    logging.info(f"Received request: request_type={request_type}, value={value}")
+    if request_type == "Bri":
+        set_brightness_from_url(value)
+        return jsonify({"status": "done"})
+    elif request_type == "on":
+        set_power(True)
+        return jsonify({"status": "on"})
+    elif request_type == "off":
+        set_power(False)
+        return jsonify({"status": "off"})
+    elif request_type == "status":
+        state = 1 if power_state else 0
+        return jsonify({"status": state})
+    elif request_type == "infoBri":
+        bri_percent = int(brightness * 100)
+        return jsonify({"brightness": bri_percent})
+    else:
+        return jsonify({"error": "Not found, set brightness: /Bri/###"}), 404
 
 if __name__ == "__main__":
     try:
         Thread(target=show, daemon=True).start()
-        Thread(target=run, daemon=True).start()
+        app.run(host='0.0.0.0', port=HOST_HTTP_PORT)
         while True:
             sleep(10)
     except Exception:
