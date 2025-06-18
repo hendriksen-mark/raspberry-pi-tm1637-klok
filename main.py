@@ -72,7 +72,8 @@ def set_power(state):
     global power_state
     power_state = state
 
-@app.route('/<request_type>/<value>', defaults={'value': None}, methods=['GET'])
+@app.route('/<request_type>', defaults={'value': None}, methods=['GET'])
+@app.route('/<request_type>/<value>', methods=['GET'])
 def handle_request(request_type: str, value: int):
     if value is None:
         value = request.args.get("value")
