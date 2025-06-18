@@ -89,10 +89,10 @@ def handle_request(request_type: str, value: int):
         return jsonify({"status": "off"})
     elif request_type == "status":
         state = 1 if power_state else 0
-        return state
+        return str(state)
     elif request_type == "infoBri":
         bri_percent = int(brightness * 100)
-        return bri_percent
+        return str(bri_percent)
     else:
         return jsonify({"error": "Not found, set brightness: /Bri/###"}), 404
 
